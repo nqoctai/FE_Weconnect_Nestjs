@@ -87,7 +87,7 @@ export const rootApi = createApi({
                     url: `/posts?sort=createdAt,desc`,
                     params: {page, size}
                 }),
-                providesTags: [{type: 'POTS'}]
+                providesTags: [{type: 'POSTS', id: 'LIST'}]
             }),
             searchUsers: builder.query({
                 query: ({page, size, filter}) => {
@@ -107,12 +107,28 @@ export const rootApi = createApi({
                         receiverId: userId
                     }
                 }),
-                invalidatesTags:(result, error, args) => [{type: 'USERS', id: args}],
+                invalidatesTags: [{type: 'USERS', id: 'LIST'}],
+            }),
+            getPendingFriendRequests: builder.query({
+                query: () => ({
+                    url: `/friends/requests`,
+                }),
+                providesTags:(result) => result ? [...result.data.map(({id}) => ({type: 'PENDING_FRIEND_REQUEST', id:id})), {type: "PENDING_FRIEND_REQUEST", id: 'LIST'}] : [{type:'PENDING_FRIEND_REQUEST', id: 'LIST'}],
             }),
         }
     }
 
 })
 
-export const {useRegisterMutation, useLoginMutation, useGetAuthUserQuery, useCreatePostMutation, useUploadImageMutation, useRefreshTokenQuery, useGetPostsQuery, useSearchUsersQuery, useSendFriendRequestMutation} = rootApi;
+export const {useRegisterMutation,
+     useLoginMutation, 
+     useGetAuthUserQuery, 
+     useCreatePostMutation, 
+     useUploadImageMutation, 
+     useRefreshTokenQuery, useGetPostsQuery, 
+     useSearchUsersQuery,
+      useSendFriendRequestMutation,
+      useGetPendingFriendRequestsQuery
+    } = rootApi;
+      
 
