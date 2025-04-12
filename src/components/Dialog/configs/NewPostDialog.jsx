@@ -33,12 +33,15 @@ const NewPostDialog = ({ userInfo }) => {
       formData.append("folder", "posts");
       formData.append("file", image);
 
-      const uploadResult = await uploadImage(formData).unwrap();
-      console.log("res upload", uploadResult);
+      let uploadResult;
+      if (image) {
+        uploadResult = await uploadImage(formData).unwrap();
+        console.log("res upload", uploadResult);
+      }
 
       const res = await createNewPost({
         content,
-        image: uploadResult.data.fileName,
+        image: uploadResult?.data?.fileName,
       }).unwrap();
       console.log("res", res);
       dispatch(closeDialog());

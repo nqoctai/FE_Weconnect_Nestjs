@@ -18,6 +18,8 @@ import ProtectedLayout from "@pages/ProtectedLayout";
 import MessagesPage from "@pages/MessagesPage";
 import { PersistGate } from "redux-persist/integration/react";
 import Dialog from "@components/Dialog";
+import Loading from "@components/Loading";
+import SearchUsersPage from "@pages/SearchUsersPage";
 
 // const MovieDetail = lazy(() => import("@pages/MovieDetail"));
 
@@ -35,6 +37,10 @@ const router = createBrowserRouter([
           {
             path: "/messages",
             element: <MessagesPage />,
+          },
+          {
+            path: "/search/users",
+            element: <SearchUsersPage />,
           },
         ],
       },
@@ -59,7 +65,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Provider store={store}>
-      <PersistGate loading={<p>Loading...</p>} persistor={persistor}>
+      <PersistGate loading={<Loading />} persistor={persistor}>
         <ThemeProvider theme={theme}>
           {/* <ModalProvider> */}
           <RouterProvider router={router} />

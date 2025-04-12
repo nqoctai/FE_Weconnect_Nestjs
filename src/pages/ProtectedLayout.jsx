@@ -1,4 +1,5 @@
 import Header from "@components/Header";
+import Loading from "@components/Loading";
 import { CircularProgress } from "@mui/material";
 import { saveUserInfor } from "@redux/slices/authSlice";
 import { useGetAuthUserQuery } from "@services/rootApi";
@@ -22,9 +23,9 @@ const ProtectedLayout = () => {
   //   return <Navigate to={`/login`} />;
   // }
 
-  // if (res.isLoading) {
-  //   return <p>Loading....</p>;
-  // }
+  if (res.isLoading) {
+    return <Loading />;
+  }
 
   // if (!res?.data?.data?.id) {
   //   return <Navigate to={`/login`} />;
@@ -32,7 +33,9 @@ const ProtectedLayout = () => {
   return (
     <div>
       <Header />
-      <Outlet />
+      <div className="bg-dark-200">
+        <Outlet />
+      </div>
     </div>
   );
 };

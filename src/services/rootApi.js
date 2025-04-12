@@ -28,13 +28,13 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
     }
 
-    
     return result;
 }
 
 export const rootApi = createApi({
     reducerPath: 'api',
     baseQuery: baseQueryWithReauth,
+    tagTypes: ['POSTS', 'USERS'],
     endpoints: (builder) => {
         return {
             register: builder.mutation({
@@ -71,8 +71,9 @@ export const rootApi = createApi({
                         url: '/posts',
                         method: 'POST',
                         body: {content, image}
-                    }
-                }
+                    };
+                },
+                invalidatesTags: ['POSTS'],
             }
             ),
             refreshToken: builder.query({
@@ -80,11 +81,38 @@ export const rootApi = createApi({
                     url: `/auth/refresh`,
                     credentials: 'include',
                 }),
-            })
+            }),
+            getPosts: builder.query({
+                query: ({page, size} = {}) => ({
+                    url: `/posts?sort=createdAt,desc`,
+                    params: {page, size}
+                }),
+                providesTags: [{type: 'POTS'}]
+            }),
+            searchUsers: builder.query({
+                query: ({page, size, filter}) => {
+                    const encodedQuery = encodeURIComponent(filter.trim())
+                    return {
+                        url: `/users?filter=name~'${encodedQuery}'`,
+                        params: {page, size}
+                    }
+                },
+                providesTags:(result) => result ? [...result.data.result.map(({id}) => ({type: 'USERS', id:id})), {type: "USERS", id: 'LIST'}] : [{type:'USERS', id: 'LIST'}],
+            }),
+            sendFriendRequest: builder.mutation({
+                query: ({userId}) => ({
+                    url: `/friends/request`,
+                    method: 'POST',
+                    body: {
+                        receiverId: userId
+                    }
+                }),
+                invalidatesTags:(result, error, args) => [{type: 'USERS', id: args}],
+            }),
         }
     }
 
 })
 
-export const {useRegisterMutation, useLoginMutation, useGetAuthUserQuery, useCreatePostMutation, useUploadImageMutation, useRefreshTokenQuery} = rootApi;
+export const {useRegisterMutation, useLoginMutation, useGetAuthUserQuery, useCreatePostMutation, useUploadImageMutation, useRefreshTokenQuery, useGetPostsQuery, useSearchUsersQuery, useSendFriendRequestMutation} = rootApi;
 

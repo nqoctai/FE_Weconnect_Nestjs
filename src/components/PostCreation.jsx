@@ -54,7 +54,7 @@ const PostCreation = () => {
   const dispatch = useDispatch();
 
   return (
-    <div className="flex gap-2 rounded bg-white p-4 shadow">
+    <div className="card flex gap-2">
       <Avatar className="!bg-primary-main">
         {userInfo?.name?.[0]?.toUpperCase()}
       </Avatar>

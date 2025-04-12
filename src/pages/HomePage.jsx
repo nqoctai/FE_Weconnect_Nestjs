@@ -7,9 +7,9 @@ import { Button, CircularProgress } from "@mui/material";
 
 function HomePage() {
   return (
-    <div className="flex gap-4 bg-dark-200 p-6">
+    <div className="container">
       <SideBar />
-      <div className="flex-1">
+      <div className="flex flex-1 flex-col gap-4">
         <PostCreation />
         <PostList />
       </div>

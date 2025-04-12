@@ -23,7 +23,7 @@ const ListStyled = styled(List)`
 const SideBarContent = () => {
   return (
     <div className="flex w-64 flex-col gap-4">
-      <ListStyled className="flex flex-col bg-white shadow">
+      <ListStyled className="card flex flex-col">
         <Link to="/" className="flex items-center">
           <HomeOutlined fontSize="small" />
           New Feeds
@@ -42,7 +42,7 @@ const SideBarContent = () => {
         </Link>
       </ListStyled>
 
-      <ListStyled className="flex flex-col bg-white shadow">
+      <ListStyled className="card flex flex-col">
         <ListSubheader className="mb-2 !px-0 !leading-none">
           Settings
         </ListSubheader>
