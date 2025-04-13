@@ -1,23 +1,20 @@
 import { Check, Close } from "@mui/icons-material";
 import { Avatar, Button } from "@mui/material";
 import { useGetPendingFriendRequestsQuery } from "@services/rootApi";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import websocketService from "@services/websocket/websocketService";
 import { useDispatch, useSelector } from "react-redux";
 import { rootApi } from "@services/rootApi";
 
 const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
-  // Implement accept and reject functionality
-  const dispatch = useDispatch();
-
   const handleAccept = () => {
-    // Implement accept functionality here
     console.log("Accept friend request", friendRequestId);
+    // Thêm logic chấp nhận lời mời kết bạn ở đây
   };
 
   const handleReject = () => {
-    // Implement reject functionality here
     console.log("Reject friend request", friendRequestId);
+    // Thêm logic từ chối lời mời kết bạn ở đây
   };
 
   return (
@@ -41,53 +38,53 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
 };
 
 const FriendRequests = () => {
+  const dispatch = useDispatch();
+  // Sử dụng RTK Query để lấy dữ liệu lời mời kết bạn
   const { data, refetch, isLoading } = useGetPendingFriendRequestsQuery();
   const [friendRequests, setFriendRequests] = useState([]);
-  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
-  // Cập nhật friendRequests state từ data API
+  // Cập nhật state từ dữ liệu API
   useEffect(() => {
     if (data?.data) {
       setFriendRequests(data.data);
-      console.log("Friend requests loaded from API:", data.data);
+      console.log("Friend requests loaded from API:", data.data.length);
     }
   }, [data]);
 
-  // Tạo hàm xử lý thông báo WebSocket bằng useCallback để có thể sử dụng làm dependency
-  const handleFriendRequest = useCallback(
-    (message) => {
-      console.log("Processing friend request notification:", message);
+  // Hàm xử lý khi nhận được thông báo lời mời kết bạn mới
+  const handleNewFriendRequest = (message) => {
+    console.log("Received WebSocket message:", message);
 
-      // Kiểm tra message có tồn tại không trước khi truy cập thuộc tính
-      if (!message) {
-        console.log("Received empty message");
+    if (!message) {
+      console.warn("Received empty WebSocket message");
+      return;
+    }
+
+    // Kiểm tra loại thông báo
+    if (message.type === "NEW_FRIEND_REQUEST") {
+      const newFriendRequest = message.content;
+      console.log("New friend request received:", newFriendRequest);
+
+      if (!newFriendRequest?.id) {
+        console.warn("Invalid friend request data received");
         return;
       }
 
-      // Kiểm tra content có tồn tại không
-      if (!message.content) {
-        console.error("Message content is missing");
-        return;
-      }
-
-      console.log(
-        "New friend request received via WebSocket:",
-        message.content,
-      );
-
-      // Cập nhật state cục bộ
-      setFriendRequests((prev) => {
+      // Cập nhật state local
+      setFriendRequests((prevRequests) => {
         // Kiểm tra xem lời mời đã tồn tại chưa
-        const exists = prev.some((req) => req.id === message.content.id);
+        const exists = prevRequests.some(
+          (req) => req.id === newFriendRequest.id,
+        );
         if (!exists) {
-          console.log("Adding new friend request to UI list");
-          return [message.content, ...prev];
+          console.log("Adding new friend request to UI");
+          return [newFriendRequest, ...prevRequests];
         }
-        return prev;
+        return prevRequests;
       });
 
-      // Cập nhật cache của RTK Query để các components khác cũng nhận được dữ liệu mới
+      // Cập nhật cache RTK Query
       try {
         dispatch(
           rootApi.util.updateQueryData(
@@ -97,26 +94,29 @@ const FriendRequests = () => {
               if (!draft.data) {
                 draft.data = [];
               }
-              // Kiểm tra xem lời mời đã tồn tại trong danh sách chưa
+
               const exists = draft.data.some(
-                (req) => req.id === message.content.id,
+                (req) => req.id === newFriendRequest.id,
               );
               if (!exists) {
-                draft.data.unshift(message.content);
+                draft.data.unshift(newFriendRequest);
               }
             },
           ),
         );
-        console.log("RTK Query cache updated successfully");
+        console.log("RTK Query cache updated");
       } catch (error) {
-        console.error("Error updating RTK Query cache:", error);
+        console.error("Failed to update RTK Query cache:", error);
       }
-    },
-    [dispatch],
-  );
 
-  // Kết nối WebSocket khi component mount
+      // Tùy chọn: Tải lại dữ liệu từ API
+      // refetch();
+    }
+  };
+
+  // Thiết lập WebSocket khi component mount
   useEffect(() => {
+    // Đảm bảo có user ID
     if (!user?.id) {
       console.log("No user ID available, can't connect to WebSocket");
       return;
@@ -124,26 +124,33 @@ const FriendRequests = () => {
 
     console.log("Setting up WebSocket connection for user:", user.id);
 
-    // Đăng ký handler trực tiếp cho sự kiện NEW_FRIEND_REQUEST
-    websocketService.registerMessageHandler(
-      "NEW_FRIEND_REQUEST",
-      handleFriendRequest,
-    );
+    // Kết nối đến WebSocket server
+    websocketService.connect();
 
-    // Kết nối đến WebSocket server (hoặc sử dụng kết nối hiện có)
-    websocketService.connect(user.id, null, (error) => {
-      console.error("WebSocket connection error:", error);
+    // Đăng ký nhận thông báo debug (để theo dõi)
+    const debugTopic = "/topic/debug";
+    websocketService._subscribeToTopic(debugTopic, (msg) => {
+      console.log("Debug notification:", msg);
+      // Nếu thông báo debug là lời mời kết bạn cho user hiện tại, xử lý nó
+      if (
+        msg?.type === "NEW_FRIEND_REQUEST" &&
+        msg?.content?.receiver?.id === user.id
+      ) {
+        handleNewFriendRequest(msg);
+      }
     });
 
-    // Vì thêm log để debug, nên cần phải test với một số thủ công
-    console.log("Testing if WebSocket handlers are set up properly");
+    // Lắng nghe thông báo lời mời kết bạn mới
+    websocketService.subscribeFriendRequests(user.id, handleNewFriendRequest);
 
     // Cleanup khi component unmount
     return () => {
-      console.log("Cleaning up WebSocket connection");
-      // Chúng ta không disconnect ở đây để giữ kết nối cho các màn hình khác
+      if (user?.id) {
+        websocketService.unsubscribe(`/topic/friend-requests/${user.id}`);
+        websocketService.unsubscribe(debugTopic);
+      }
     };
-  }, [user, handleFriendRequest]);
+  }, [user, dispatch]);
 
   if (isLoading) {
     return <div className="card">Loading...</div>;
@@ -156,16 +163,14 @@ const FriendRequests = () => {
       </p>
       <div className="space-y-4">
         {friendRequests && friendRequests.length > 0 ? (
-          friendRequests
-            .slice(0, 3)
-            .map((item) => (
-              <FriendRequestItem
-                key={item.id}
-                fullName={item.sender.name}
-                id={item.sender.id}
-                friendRequestId={item.id}
-              />
-            ))
+          friendRequests.map((item) => (
+            <FriendRequestItem
+              key={item.id}
+              fullName={item.sender.name}
+              id={item.sender.id}
+              friendRequestId={item.id}
+            />
+          ))
         ) : (
           <p>No friend requests</p>
         )}
