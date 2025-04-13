@@ -1,3 +1,4 @@
+import NotificatinosPanel from "@components/NotificatinosPanel";
 import { useDetectLayout, useLogout, useUserInfo } from "@hooks/index";
 
 import {
@@ -108,11 +109,7 @@ const Header = () => {
                 <Search />
               </IconButton>
             )}
-            <IconButton size="medium">
-              <Badge badgeContent={4} color="error">
-                <Notifications />
-              </Badge>
-            </IconButton>
+            <NotificatinosPanel />
             <IconButton size="medium" onClick={handleUserProfileClick}>
               {/* <AccountCircle /> */}
               <Avatar className="!bg-primary-main">

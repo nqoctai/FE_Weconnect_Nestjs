@@ -199,6 +199,25 @@ export const rootApi = createApi({
                 // Invalidate cả hai loại tag
                 invalidatesTags: ['PENDING_FRIEND_REQUEST', {type: 'USERS', id: 'LIST'}],
             }),
+            getNotifications: builder.query({
+                query: () => ({
+                    url: `/notifications`,
+                }),
+                providesTags: (result) => {
+                    // Check if result exists and has data property
+                    if (!result || !result.data) return [{ type: 'NOTIFICATIONS', id: 'LIST' }];
+                    
+                    // Check if data is an array
+                    const dataArray = Array.isArray(result.data) 
+                        ? result.data 
+                        : (result.data.result || result.data.items || []);
+                        
+                    return [
+                        ...dataArray.map(item => ({ type: 'NOTIFICATIONS', id: item.id || 'unknown' })),
+                        { type: 'NOTIFICATIONS', id: 'LIST' }
+                    ];
+                }
+            }),
         }
     }
 
@@ -214,7 +233,8 @@ export const {useRegisterMutation,
       useSendFriendRequestMutation,
       useGetPendingFriendRequestsQuery,
       useAcceptFriendRequestMutation,
-      useCancelFriendRequestMutation
+      useCancelFriendRequestMutation,
+      useGetNotificationsQuery,
     } = rootApi;
 
 

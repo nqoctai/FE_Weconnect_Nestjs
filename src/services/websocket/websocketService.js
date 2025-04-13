@@ -10,57 +10,106 @@ class WebSocketService {
         this.connected = false;
         this.subscriptions = {};
         this.pendingSubscriptions = [];
+        this.connectPromise = null;
     }
 
     connect(userId) {
+        // Trả về promise hiện tại nếu đang kết nối
+        if (this.connectPromise) {
+            return this.connectPromise;
+        }
+        
+        // Nếu đã kết nối, xử lý các subscription đang chờ và trả về promise đã resolve
         if (this.connected && this.client) {
-            // Nếu đã kết nối, xử lý các subscription đang chờ
             this._processPendingSubscriptions();
-            return;
+            return Promise.resolve();
         }
         
         console.log(`Connecting to WebSocket at ${WS_URL}`);
-
-        this.client = new Client({
-            webSocketFactory: () => new SockJS(WS_URL),
-            debug: function(str) {
-                console.debug('STOMP: ' + str);
-            },
-            reconnectDelay: 5000
-        });
-
-        this.client.onConnect = () => {
-            this.connected = true;
-            console.log('Connected to WebSocket server');
-            
-            // Xử lý các subscription đang chờ sau khi đã kết nối
-            this._processPendingSubscriptions();
-        };
         
-        this.client.onStompError = (error) => {
-            console.error('STOMP error:', error);
-        };
-
-        this.client.activate();
+        // Tạo promise mới cho kết nối
+        this.connectPromise = new Promise((resolve, reject) => {
+            try {
+                this.client = new Client({
+                    webSocketFactory: () => new SockJS(WS_URL),
+                    debug: function(str) {
+                        console.debug('STOMP: ' + str);
+                    },
+                    reconnectDelay: 5000
+                });
+                
+                this.client.onConnect = () => {
+                    this.connected = true;
+                    console.log('Connected to WebSocket server');
+                    
+                    // Xử lý các subscription đang chờ sau khi đã kết nối
+                    this._processPendingSubscriptions();
+                    
+                    // Resolve promise khi kết nối thành công
+                    resolve();
+                    this.connectPromise = null;
+                };
+                
+                this.client.onStompError = (error) => {
+                    console.error('STOMP error:', error);
+                    reject(error);
+                    this.connectPromise = null;
+                };
+                
+                this.client.onWebSocketClose = () => {
+                    console.log('WebSocket connection closed');
+                    this.connected = false;
+                    this.connectPromise = null;
+                };
+                
+                this.client.activate();
+            } catch (error) {
+                console.error('Error activating STOMP client:', error);
+                this.connected = false;
+                reject(error);
+                this.connectPromise = null;
+            }
+        });
+        
+        return this.connectPromise;
     }
 
     // Xử lý các subscription đang chờ
     _processPendingSubscriptions() {
-        if (this.pendingSubscriptions.length > 0) {
-            console.log(`Processing ${this.pendingSubscriptions.length} pending subscriptions`);
-            
-            this.pendingSubscriptions.forEach(sub => {
-                this._subscribeToTopic(sub.topic, sub.callback);
-            });
-            
-            this.pendingSubscriptions = [];
+        if (!this.connected || !this.client || this.pendingSubscriptions.length === 0) {
+            return;
         }
+        
+        console.log(`Processing ${this.pendingSubscriptions.length} pending subscriptions`);
+        
+        // Sao chép mảng để tránh vấn đề khi xử lý các items
+        const pendingsToProcess = [...this.pendingSubscriptions];
+        this.pendingSubscriptions = [];
+        
+        pendingsToProcess.forEach(sub => {
+            try {
+                this._subscribeToTopic(sub.topic, sub.callback);
+            } catch (e) {
+                console.error(`Error processing subscription to ${sub.topic}:`, e);
+                // Đưa lại vào hàng đợi nếu gặp lỗi
+                this.pendingSubscriptions.push(sub);
+            }
+        });
     }
     
     // Đăng ký subscribe vào một topic
     _subscribeToTopic(topic, callback) {
         if (!this.client || !this.connected) {
-            console.error('Cannot subscribe - WebSocket not connected');
+            console.log(`Connection not ready. Adding ${topic} to pending subscriptions from _subscribeToTopic`);
+            this.pendingSubscriptions.push({
+                topic,
+                callback
+            });
+            
+            // Khởi tạo kết nối nếu chưa được kết nối
+            if (!this.client) {
+                this.connect();
+            }
             return false;
         }
         
@@ -68,6 +117,10 @@ class WebSocketService {
             console.log(`Subscribing to ${topic}`);
             
             try {
+                if (!this.client.connected) {
+                    throw new Error('STOMP client not connected yet');
+                }
+                
                 const subscription = this.client.subscribe(topic, (message) => {
                     try {
                         const data = JSON.parse(message.body);
@@ -84,6 +137,13 @@ class WebSocketService {
                 return true;
             } catch (error) {
                 console.error(`Failed to subscribe to ${topic}:`, error);
+                
+                // Thêm lại vào pending nếu kết nối chưa sẵn sàng
+                this.pendingSubscriptions.push({
+                    topic,
+                    callback
+                });
+                
                 return false;
             }
         }
@@ -94,31 +154,37 @@ class WebSocketService {
     disconnect() {
         console.log("Disconnecting WebSocket");
         if (this.client) {
-            this.client.deactivate();
+            try {
+                this.client.deactivate();
+            } catch (e) {
+                console.error("Error disconnecting WebSocket:", e);
+            }
         }
         this.connected = false;
+        this.connectPromise = null;
         this.subscriptions = {};
         this.pendingSubscriptions = [];
     }
 
     // Đăng ký nhận thông báo lời mời kết bạn mới
-    subscribeFriendRequests(userId, callback) {
+    async subscribeFriendRequests(userId, callback) {
         const topic = `/topic/friend-requests/${userId}`;
         
-        if (this.connected && this.client) {
+        try {
+            // Đảm bảo kết nối được thiết lập trước
+            if (!this.connected || !this.client) {
+                await this.connect();
+            }
+            
             return this._subscribeToTopic(topic, callback);
-        } else {
-            console.log(`Connection not ready. Adding ${topic} to pending subscriptions`);
+        } catch (error) {
+            console.error(`Error subscribing to friend requests for user ${userId}:`, error);
+            
             // Lưu lại đăng ký này để xử lý sau khi kết nối được thiết lập
             this.pendingSubscriptions.push({
                 topic,
                 callback
             });
-            
-            // Khởi tạo kết nối nếu chưa được kết nối
-            if (!this.client) {
-                this.connect();
-            }
             
             return false;
         }

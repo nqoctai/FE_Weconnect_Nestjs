@@ -56,14 +56,8 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
             icon={<Close className="mr-1" fontSize="small" />}
             isLoading={isCanceling}
           >
-            Cancle
+            Cancel
           </Button>
-          {/* <Button variant="contained" size="small" onClick={handleAccept}>
-            <Check className="mr-1" fontSize="small" /> Accept
-          </Button>
-          <Button variant="outlined" size="small" onClick={handleReject}>
-            <Close className="mr-1" fontSize="small" /> Cancel
-          </Button> */}
         </div>
       </div>
     </div>
@@ -104,7 +98,13 @@ const FriendRequests = () => {
         return;
       }
 
-      // Cập nhật state local
+      // Trực tiếp gọi refetch để lấy dữ liệu mới nhất từ API
+      console.log(
+        "Refetching friend requests from API due to WebSocket notification",
+      );
+      refetch();
+
+      // Cập nhật state local cho đến khi refetch hoàn thành
       setFriendRequests((prevRequests) => {
         // Kiểm tra xem lời mời đã tồn tại chưa
         const exists = prevRequests.some(
@@ -116,34 +116,6 @@ const FriendRequests = () => {
         }
         return prevRequests;
       });
-
-      // Cập nhật cache RTK Query
-      try {
-        dispatch(
-          rootApi.util.updateQueryData(
-            "getPendingFriendRequests",
-            undefined,
-            (draft) => {
-              if (!draft.data) {
-                draft.data = [];
-              }
-
-              const exists = draft.data.some(
-                (req) => req.id === newFriendRequest.id,
-              );
-              if (!exists) {
-                draft.data.unshift(newFriendRequest);
-              }
-            },
-          ),
-        );
-        console.log("RTK Query cache updated");
-      } catch (error) {
-        console.error("Failed to update RTK Query cache:", error);
-      }
-
-      // Tùy chọn: Tải lại dữ liệu từ API
-      // refetch();
     }
   };
 
@@ -158,32 +130,43 @@ const FriendRequests = () => {
     console.log("Setting up WebSocket connection for user:", user.id);
 
     // Kết nối đến WebSocket server
-    websocketService.connect();
+    websocketService
+      .connect()
+      .then(() => {
+        console.log("WebSocket connection established, subscribing to topics");
 
-    // Đăng ký nhận thông báo debug (để theo dõi)
-    const debugTopic = "/topic/debug";
-    websocketService._subscribeToTopic(debugTopic, (msg) => {
-      console.log("Debug notification:", msg);
-      // Nếu thông báo debug là lời mời kết bạn cho user hiện tại, xử lý nó
-      if (
-        msg?.type === "NEW_FRIEND_REQUEST" &&
-        msg?.content?.receiver?.id === user.id
-      ) {
-        handleNewFriendRequest(msg);
-      }
-    });
+        // Đăng ký nhận thông báo lời mời kết bạn mới
+        websocketService.subscribeFriendRequests(
+          user.id,
+          handleNewFriendRequest,
+        );
 
-    // Lắng nghe thông báo lời mời kết bạn mới
-    websocketService.subscribeFriendRequests(user.id, handleNewFriendRequest);
+        // Đăng ký nhận thông báo debug (để theo dõi)
+        websocketService._subscribeToTopic("/topic/debug", (msg) => {
+          console.log("Debug notification received:", msg);
+
+          // Nếu thông báo debug là lời mời kết bạn cho user hiện tại, xử lý nó
+          if (
+            msg?.type === "NEW_FRIEND_REQUEST" &&
+            msg?.content?.receiver?.id === user.id
+          ) {
+            handleNewFriendRequest(msg);
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to set up WebSocket connection:", error);
+      });
 
     // Cleanup khi component unmount
     return () => {
       if (user?.id) {
+        console.log("Cleaning up WebSocket subscriptions");
         websocketService.unsubscribe(`/topic/friend-requests/${user.id}`);
-        websocketService.unsubscribe(debugTopic);
+        websocketService.unsubscribe("/topic/debug");
       }
     };
-  }, [user, dispatch]);
+  }, [user, dispatch, refetch]);
 
   if (isLoading) {
     return <div className="card">Loading...</div>;
