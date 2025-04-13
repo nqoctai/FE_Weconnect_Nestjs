@@ -1,7 +1,12 @@
+import MyButton from "@components/Button";
 import Loading from "@components/Loading";
 import { Check, Close, MessageOutlined, PersonAdd } from "@mui/icons-material";
 import { Avatar, Button, CircularProgress } from "@mui/material";
-import { useSendFriendRequestMutation } from "@services/rootApi";
+import {
+  useAcceptFriendRequestMutation,
+  useCancelFriendRequestMutation,
+  useSendFriendRequestMutation,
+} from "@services/rootApi";
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -11,8 +16,27 @@ const UserCard = ({
   fullName = "",
   requestSent,
   requestReceived,
+  friendRequestId,
 }) => {
   const [sendFriendRequest, { isLoading }] = useSendFriendRequestMutation();
+  const [acceptFriendRequets, { isLoading: isAccepting, data: acceptData }] =
+    useAcceptFriendRequestMutation();
+  const [cancelFriendRequets, { isLoading: isCanceling, data: cancelData }] =
+    useCancelFriendRequestMutation();
+
+  const handleAccept = () => {
+    console.log("Accept friend request", friendRequestId);
+    // Thêm logic chấp nhận lời mời kết bạn ở đây
+    acceptFriendRequets({ friendRequestId });
+    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
+  };
+
+  const handleReject = () => {
+    console.log("Reject friend request", friendRequestId);
+    // Thêm logic từ chối lời mời kết bạn ở đây
+    cancelFriendRequets({ friendRequestId });
+    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
+  };
 
   const getActionButtons = () => {
     if (isFriend) {
@@ -34,12 +58,26 @@ const UserCard = ({
     if (requestReceived) {
       return (
         <div>
-          <Button variant="contained" size="small">
-            <Check className="mr-1" fontSize="small" /> Accept
-          </Button>
-          <Button variant="contained" size="small">
-            <Close className="mr-1" fontSize="small" /> Cancel
-          </Button>
+          <div className="mt-2 space-x-1">
+            <MyButton
+              variant="contained"
+              size="small"
+              onClick={handleAccept}
+              icon={<Check className="mr-1" fontSize="small" />}
+              isLoading={isAccepting}
+            >
+              Accept
+            </MyButton>
+            <MyButton
+              variant="outlined"
+              size="small"
+              onClick={handleReject}
+              icon={<Close className="mr-1" fontSize="small" />}
+              isLoading={isCanceling}
+            >
+              Cancle
+            </MyButton>
+          </div>
         </div>
       );
     }

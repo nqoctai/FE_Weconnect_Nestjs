@@ -1,20 +1,35 @@
 import { Check, Close } from "@mui/icons-material";
-import { Avatar, Button } from "@mui/material";
-import { useGetPendingFriendRequestsQuery } from "@services/rootApi";
+import { Avatar } from "@mui/material";
+import {
+  useAcceptFriendRequestMutation,
+  useCancelFriendRequestMutation,
+  useGetPendingFriendRequestsQuery,
+} from "@services/rootApi";
 import React, { useEffect, useState } from "react";
 import websocketService from "@services/websocket/websocketService";
 import { useDispatch, useSelector } from "react-redux";
 import { rootApi } from "@services/rootApi";
+import Button from "@components/Button";
+import { useCacheRedux } from "@hooks/index";
 
 const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
+  const [acceptFriendRequets, { isLoading: isAccepting, data: acceptData }] =
+    useAcceptFriendRequestMutation();
+  const [cancelFriendRequets, { isLoading: isCanceling, data: cancelData }] =
+    useCancelFriendRequestMutation();
+
   const handleAccept = () => {
     console.log("Accept friend request", friendRequestId);
     // Thêm logic chấp nhận lời mời kết bạn ở đây
+    acceptFriendRequets({ friendRequestId });
+    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
   };
 
   const handleReject = () => {
     console.log("Reject friend request", friendRequestId);
     // Thêm logic từ chối lời mời kết bạn ở đây
+    cancelFriendRequets({ friendRequestId });
+    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
   };
 
   return (
@@ -25,12 +40,30 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
       <div>
         <p className="font-bold">{fullName}</p>
         <div className="mt-2 space-x-1">
-          <Button variant="contained" size="small" onClick={handleAccept}>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleAccept}
+            icon={<Check className="mr-1" fontSize="small" />}
+            isLoading={isAccepting}
+          >
+            Accept
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleReject}
+            icon={<Close className="mr-1" fontSize="small" />}
+            isLoading={isCanceling}
+          >
+            Cancle
+          </Button>
+          {/* <Button variant="contained" size="small" onClick={handleAccept}>
             <Check className="mr-1" fontSize="small" /> Accept
           </Button>
           <Button variant="outlined" size="small" onClick={handleReject}>
             <Close className="mr-1" fontSize="small" /> Cancel
-          </Button>
+          </Button> */}
         </div>
       </div>
     </div>

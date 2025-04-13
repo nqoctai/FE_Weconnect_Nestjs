@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux"
 import { useMediaQuery, useTheme } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useGetPostsQuery } from "@services/rootApi";
+import { rootApi, useGetPostsQuery } from "@services/rootApi";
 import { throttle } from "lodash";
 
 export const useLogout = () => {
@@ -103,4 +103,37 @@ export const useInfiniteScroll = ({hasMore, loadMore, isFetching, threshold = 50
           handleScroll.cancel();
         };
     }, [handleScroll]);
+}
+
+
+export const useCacheRedux = (friendRequestId) => {
+  const dispatch = useDispatch();
+  const cacheRedux = () => {
+    try {
+      dispatch(
+        rootApi.util.updateQueryData(
+          "getPendingFriendRequests",
+          undefined,
+          (draft) => {
+            if (!draft.data) {
+              draft.data = [];
+            }
+            // Xóa lời mời đã chấp nhận khỏi danh sách
+            const index = draft.data.findIndex(
+              (req) => req.id === friendRequestId,
+            );
+            if (index !== -1) {
+              draft.data.splice(index, 1);
+            }
+          },
+        ),
+      );
+      console.log("RTK Query cache updated after accepting friend request");
+    } catch (error) {
+      console.error("Failed to update RTK Query cache:", error);
+    }
+  }
+
+  return {cacheRedux}
+   
 }

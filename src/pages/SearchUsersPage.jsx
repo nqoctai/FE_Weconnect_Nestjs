@@ -26,6 +26,7 @@ const SearchUsersPage = () => {
             isFriend={user.friend}
             requestSent={user.requestSent}
             requestReceived={user.requestReceived}
+            friendRequestId={user.friendsId}
           />
         ))}
       </div>
