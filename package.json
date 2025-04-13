@@ -17,6 +17,7 @@
     "@mui/icons-material": "^7.0.1",
     "@mui/material": "^7.0.1",
     "@reduxjs/toolkit": "^2.6.1",
+    "@stomp/stompjs": "^7.1.1",
     "dayjs": "^1.11.13",
     "framer-motion": "^12.6.3",
     "lodash": "^4.17.21",
@@ -27,6 +28,7 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.4.1",
     "redux-persist": "^6.0.0",
+    "sockjs-client": "^1.6.1",
     "yup": "^1.6.1"
   },
   "devDependencies": {

@@ -8,7 +8,7 @@ const SearchUsersPage = () => {
 
   const { data, isFetching } = useSearchUsersQuery({
     page: 1,
-    size: 10,
+    size: 20,
     filter: location?.state?.searchTerm,
   });
 
