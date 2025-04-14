@@ -91,7 +91,7 @@ export const rootApi = createApi({
                     url: `/posts?sort=createdAt,desc`,
                     params: {page, size}
                 }),
-                providesTags: [{type: 'POSTS', id: 'LIST'}]
+                providesTags: [ {type: 'POSTS', id: 'LIST' }],
             }),
             searchUsers: builder.query({
                 query: ({page, size, filter}) => {
@@ -218,6 +218,23 @@ export const rootApi = createApi({
                     ];
                 }
             }),
+            likePosts: builder.mutation({
+                query: (postId) => ({
+                    url: `/posts/${+postId}/like`,
+                    method: 'POST',
+                }),
+                
+                invalidatesTags: ['POSTS', {type: 'USERS', id: 'LIST'}],
+            }),
+            unLikePosts: builder.mutation({
+                query: (postId) => ({
+                    url: `/posts/${+postId}/unlike`,
+                    method: 'DELETE',
+                }),
+                
+                invalidatesTags: ['POSTS', {type: 'USERS', id: 'LIST'}],
+            }),
+
         }
     }
 
@@ -235,6 +252,8 @@ export const {useRegisterMutation,
       useAcceptFriendRequestMutation,
       useCancelFriendRequestMutation,
       useGetNotificationsQuery,
+      useLikePostsMutation,
+      useUnLikePostsMutation,
     } = rootApi;
 
 

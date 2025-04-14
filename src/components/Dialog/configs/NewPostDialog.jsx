@@ -9,7 +9,9 @@ import {
 } from "@mui/material";
 import { closeDialog } from "@redux/slices/dialogSlice";
 import { openSnackbar } from "@redux/slices/snackbarSlice";
+import { refreshRequested } from "@redux/slices/postsSlice";
 import {
+  rootApi,
   useCreatePostMutation,
   useUploadImageMutation,
 } from "@services/rootApi";
@@ -43,7 +45,33 @@ const NewPostDialog = ({ userInfo }) => {
         content,
         image: uploadResult?.data?.fileName,
       }).unwrap();
-      console.log("res", res);
+
+      // Cập nhật cache tạm thời (optimistic update)
+      dispatch(
+        rootApi.util.updateQueryData(
+          "getPosts",
+          { page: 1, size: 10 },
+          (draft) => {
+            draft.data.result.unshift(res.data);
+          },
+        ),
+      );
+
+      // Chủ động làm mới dữ liệu từ server
+      dispatch(
+        rootApi.endpoints.getPosts.initiate(
+          { page: 1, size: 10 },
+          { forceRefetch: true },
+        ),
+      );
+
+      // Đồng thời invalidate tags để các queries khác cũng được làm mới
+      dispatch(rootApi.util.invalidateTags(["POSTS"]));
+
+      // Dispatch action để refresh danh sách post
+      dispatch(refreshRequested());
+
+      console.log("Post created successfully, requested refresh");
       dispatch(closeDialog());
       dispatch(openSnackbar({ message: "Create Posts Successfully!" }));
     } catch (error) {

@@ -1,10 +1,11 @@
-import { Notifications } from "@mui/icons-material";
-import { Badge, IconButton } from "@mui/material";
+import { Circle, Notifications } from "@mui/icons-material";
+import { Avatar, Badge, IconButton, Menu, MenuItem } from "@mui/material";
 import { useGetNotificationsQuery } from "@services/rootApi";
-import React from "react";
+import React, { useState } from "react";
 
 const NotificatinosPanel = () => {
   const { data, isLoading, error } = useGetNotificationsQuery();
+  const [anchorEl, setAnchorEl] = useState(null);
 
   // Safely handle the notification count
   const getNotificationCount = () => {
@@ -28,12 +29,55 @@ const NotificatinosPanel = () => {
     return 0;
   };
 
+  const handleNotificationsClick = (event) => {
+    setAnchorEl(event.target);
+  };
+
+  const renderNotificationsMenu = (
+    <Menu
+      open={!!anchorEl}
+      anchorEl={anchorEl}
+      onClose={() => setAnchorEl(null)}
+      transformOrigin={{
+        vertical: "top",
+        horizontal: "right",
+      }}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "right",
+      }}
+      classes={{ paper: "!min-w-80 !max-h-80 scroll-y-auto" }}
+    >
+      {(data?.data?.result || []).map((notification) => (
+        <MenuItem
+          key={notification.id}
+          className="flex items-center !justify-between gap-2"
+        >
+          <div className="flex items-center gap-2">
+            <Avatar className="!bg-primary-main" fontSize="small">
+              {notification?.userName?.[0]?.toUpperCase()}
+            </Avatar>
+            <div className="text-sm font-semibold">{notification.content}</div>
+          </div>
+          <div>
+            {!notification.read && (
+              <Circle className="text-primary-main" fontSize="10px" />
+            )}
+          </div>
+        </MenuItem>
+      ))}
+    </Menu>
+  );
+
   return (
-    <IconButton size="medium">
-      <Badge badgeContent={getNotificationCount()} color="error">
-        <Notifications />
-      </Badge>
-    </IconButton>
+    <>
+      <IconButton size="medium" onClick={handleNotificationsClick}>
+        <Badge badgeContent={getNotificationCount()} color="error">
+          <Notifications />
+        </Badge>
+      </IconButton>
+      {renderNotificationsMenu}
+    </>
   );
 };
 

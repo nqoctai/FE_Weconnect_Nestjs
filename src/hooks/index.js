@@ -39,47 +39,80 @@ export const useLazyLoadPost = () => {
     const [page, setPage] = useState(1);
     const size = 10;
     const [posts, setPosts] = useState([]);
-
-
     const [hasMore, setHasMore] = useState(true);
+    const dispatch = useDispatch();
     
+    // Lấy refreshToken từ Redux store
+    const refreshToken = useSelector((state) => state.posts.refreshToken);
+    
+    // Sử dụng refreshToken như một phần của query key để đảm bảo refetch
     const { data, isSuccess, isFetching } = useGetPostsQuery({
         page: page,
         size,
+        refreshToken
     });
     
-    const previousDataRef = useRef();
-    console.log(data?.data?.result, "data");
-
+    // Reset toàn bộ danh sách khi unmount hoặc khi refreshToken thay đổi
     useEffect(() => {
-        if (
-          isSuccess &&
-          data?.data?.result &&
-          previousDataRef.current !== data.data.result
-        ) {
-          if (!data.data.result.length) {
-            setHasMore(false);
-            return;
-          }
-          previousDataRef.current = data.data.result;
-          console.log("data rs", data.data.result);
-          setPosts((prevPosts) => {
-            return [...prevPosts, ...data.data.result];
-          });
+        if (refreshToken > 0) {
+            setPosts([]);
+            setPage(1);
+            setHasMore(true);
         }
-    }, [isSuccess, data]);
+        
+        return () => {
+            setPosts([]);
+        };
+    }, [refreshToken]);
+    
+    // Effect xử lý khi data thay đổi
+    useEffect(() => {
+        if (isSuccess && data?.data?.result) {
+            if (page === 1) {
+                // Nếu load trang 1, reset danh sách và chỉ hiển thị kết quả mới
+                setPosts([...data.data.result]);
+                
+                // Kiểm tra nếu không còn dữ liệu
+                if (!data.data.result.length) {
+                    setHasMore(false);
+                } else {
+                    setHasMore(true);
+                }
+            } else {
+                // Nếu load trang tiếp theo, thêm vào danh sách hiện tại
+                setPosts(prevPosts => {
+                    // Kiểm tra trùng lặp
+                    const existingIds = new Set(prevPosts.map(post => post.id));
+                    const newPosts = data.data.result.filter(post => !existingIds.has(post.id));
+                    
+                    return [...prevPosts, ...newPosts];
+                });
+                
+                // Kiểm tra nếu không còn dữ liệu để load thêm
+                if (!data.data.result.length) {
+                    setHasMore(false);
+                }
+            }
+        }
+    }, [isSuccess, data, page]);
+
+    // Function để load thêm posts
     const loadMore = useCallback(() => {
-        setPage((page) => page + 1);
-    }, []);
+        if (!isFetching && hasMore) {
+            setPage(prevPage => prevPage + 1);
+        }
+    }, [isFetching, hasMore]);
 
-    useInfiniteScroll({hasMore, loadMore, isFetching,})
+    // Function để refresh lại từ đầu
+    const refreshPosts = useCallback(() => {
+        // Dispatch action để tăng refreshToken trong redux store
+        dispatch({ type: 'posts/refreshRequested' });
+    }, [dispatch]);
 
-   
+    useInfiniteScroll({hasMore, loadMore, isFetching})
 
-    return { isFetching, posts}
-
+    return { isFetching, posts, refreshPosts }
 }
-
 
 export const useInfiniteScroll = ({hasMore, loadMore, isFetching, threshold = 50, throttleMs = 500}) => {
     const handleScroll = useMemo(() => {
