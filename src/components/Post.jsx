@@ -1,11 +1,14 @@
-import { Comment, ThumbUp } from "@mui/icons-material";
-import { Avatar, Button } from "@mui/material";
+import { useUserInfo } from "@hooks/index";
+import { Comment, Send, ThumbUp } from "@mui/icons-material";
+import { Avatar, Button, IconButton, TextField } from "@mui/material";
 import {
+  useCreateCommentMutation,
   useLikePostsMutation,
   useUnLikePostsMutation,
 } from "@services/rootApi";
 import dayjs from "dayjs";
-import React from "react";
+import { set } from "lodash";
+import React, { useState } from "react";
 
 const Post = ({
   fullName,
@@ -17,9 +20,14 @@ const Post = ({
   postId,
   isLiked,
 }) => {
+  const userInfo = useUserInfo();
+  const [isCommentBoxOpen, setIsCommentBoxOpen] = useState(false);
+  const [comment, setComment] = useState("");
+
   const baseImage = `http://localhost:8080/storage/posts`;
   const [likePost] = useLikePostsMutation();
   const [unLikePost] = useUnLikePostsMutation();
+  const [conmmentPost] = useCreateCommentMutation();
 
   const handleLikePost = async (postId) => {
     console.log("Post ID: ", postId);
@@ -36,6 +44,18 @@ const Post = ({
       await unLikePost(postId).unwrap();
     } catch (error) {
       console.error("Failed to un like post: ", error);
+    }
+  };
+
+  const handleComment = async (postId) => {
+    try {
+      console.log("Post ID: ", postId);
+      console.log("Comment: ", comment);
+      await conmmentPost({ postId, content: comment }).unwrap();
+      setComment("");
+      setIsCommentBoxOpen(false);
+    } catch (error) {
+      console.error("Failed to comment: ", error);
     }
   };
 
@@ -81,10 +101,54 @@ const Post = ({
           />{" "}
           Like
         </Button>
-        <Button size="small" className="flex-1 !text-dark-100">
+        <Button
+          size="small"
+          className="flex-1 !text-dark-100"
+          onClick={() => setIsCommentBoxOpen(!isCommentBoxOpen)}
+        >
           <Comment fontSize="small" className="mr-1" /> Comment
         </Button>
       </div>
+      {isCommentBoxOpen && (
+        <>
+          <div className="max-h-48 overflow-y-auto py-2">
+            {[...comments].reverse().map((comment) => (
+              <div key={comment.id} className="flex gap-2 px-4 py-2">
+                <Avatar className="!h-6 !w-6 !bg-primary-main">
+                  {comment?.user?.name?.[0]?.toUpperCase()}
+                </Avatar>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold">{comment?.user?.name}</p>
+                    <p className="text-xs text-dark-400">
+                      {dayjs(comment.createdAt).format("DD/MM/YYYY HH:mm")}
+                    </p>
+                  </div>
+                  <p>{comment?.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card flex items-center gap-2">
+            <Avatar className="!h-6 !w-6 !bg-primary-main">
+              {userInfo?.name?.[0]?.toUpperCase()}
+            </Avatar>
+            <TextField
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="flex-1"
+              size="small"
+              placeholder="Comment..."
+            />
+            <IconButton
+              onClick={() => handleComment(postId)}
+              disabled={!comment}
+            >
+              <Send className="text-primary-main" />
+            </IconButton>
+          </div>
+        </>
+      )}
     </div>
   );
 };

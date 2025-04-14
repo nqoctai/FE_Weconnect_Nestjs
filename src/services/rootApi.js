@@ -234,6 +234,17 @@ export const rootApi = createApi({
                 
                 invalidatesTags: ['POSTS', {type: 'USERS', id: 'LIST'}],
             }),
+            createComment: builder.mutation({
+                query: ({postId, content}) => ({
+                    url: `/posts/${+postId}/comments`,
+                    method: 'POST',
+                    body: {
+                        content: content
+                    }
+                }),
+                
+                invalidatesTags: ['POSTS', {type: 'USERS', id: 'LIST'}],
+            }),
 
         }
     }
@@ -254,6 +265,7 @@ export const {useRegisterMutation,
       useGetNotificationsQuery,
       useLikePostsMutation,
       useUnLikePostsMutation,
+        useCreateCommentMutation,
     } = rootApi;
 
 

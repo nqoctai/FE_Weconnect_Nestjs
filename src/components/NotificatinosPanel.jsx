@@ -46,7 +46,7 @@ const NotificatinosPanel = () => {
         vertical: "bottom",
         horizontal: "right",
       }}
-      classes={{ paper: "!min-w-80 !max-h-80 scroll-y-auto" }}
+      classes={{ paper: "!min-w-80 !max-h-80 overflow-y-auto" }}
     >
       {(data?.data?.result || []).map((notification) => (
         <MenuItem
