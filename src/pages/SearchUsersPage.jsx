@@ -1,15 +1,16 @@
 import UserCard from "@components/UserCard";
-import { useSearchUsersQuery } from "@services/rootApi";
+import { useSearchUsers } from "@hooks/apiHook";
+
 import React from "react";
 import { useLocation } from "react-router-dom";
 
 const SearchUsersPage = () => {
   const location = useLocation();
 
-  const { data, isFetching } = useSearchUsersQuery({
+  const { data } = useSearchUsers({
+    filter: location?.state?.searchTerm,
     page: 1,
     size: 20,
-    filter: location?.state?.searchTerm,
   });
 
   console.log("data >>>", data);

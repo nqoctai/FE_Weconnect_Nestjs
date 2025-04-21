@@ -1,35 +1,47 @@
 import { Check, Close } from "@mui/icons-material";
 import { Avatar } from "@mui/material";
-import {
-  useAcceptFriendRequestMutation,
-  useCancelFriendRequestMutation,
-  useGetPendingFriendRequestsQuery,
-} from "@services/rootApi";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useCallback } from "react";
 import websocketService from "@services/websocket/websocketService";
-import { useDispatch, useSelector } from "react-redux";
-import { rootApi } from "@services/rootApi";
-import Button from "@components/Button";
-import { useCacheRedux } from "@hooks/index";
+import { useSelector } from "react-redux";
 
-const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
-  const [acceptFriendRequets, { isLoading: isAccepting, data: acceptData }] =
-    useAcceptFriendRequestMutation();
-  const [cancelFriendRequets, { isLoading: isCanceling, data: cancelData }] =
-    useCancelFriendRequestMutation();
+import Button from "@components/Button";
+import {
+  useAcceptFriendRequest,
+  useGetPendingFriendRequests,
+  useRejectFriendRequest,
+} from "@hooks/apiHook";
+import { useQueryClient } from "@tanstack/react-query";
+
+const FriendRequestItem = ({ fullName, friendRequestId }) => {
+  const acceptFriendRequests = useAcceptFriendRequest();
+  const cancelFriendRequests = useRejectFriendRequest();
+  const queryClient = useQueryClient();
 
   const handleAccept = () => {
     console.log("Accept friend request", friendRequestId);
-    // Thêm logic chấp nhận lời mời kết bạn ở đây
-    acceptFriendRequets({ friendRequestId });
-    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
+    acceptFriendRequests.mutateAsync(friendRequestId, {
+      onSuccess: (data) => {
+        console.log("Friend request accepted successfully", data);
+        queryClient.invalidateQueries(["pendingFriendRequests"]);
+      },
+      onError: (error) => {
+        console.error("Error accepting friend request", error);
+      },
+    });
   };
 
   const handleReject = () => {
     console.log("Reject friend request", friendRequestId);
-    // Thêm logic từ chối lời mời kết bạn ở đây
-    cancelFriendRequets({ friendRequestId });
-    // Tag invalidation sẽ tự động xử lý việc cập nhật cache
+
+    cancelFriendRequests.mutateAsync(friendRequestId, {
+      onSuccess: (data) => {
+        console.log("Friend request rejected successfully", data);
+        queryClient.invalidateQueries(["pendingFriendRequests"]);
+      },
+      onError: (error) => {
+        console.error("Error rejecting friend request", error);
+      },
+    });
   };
 
   return (
@@ -45,7 +57,7 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
             size="small"
             onClick={handleAccept}
             icon={<Check className="mr-1" fontSize="small" />}
-            isLoading={isAccepting}
+            isLoading={acceptFriendRequests.isLoading}
           >
             Accept
           </Button>
@@ -54,7 +66,7 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
             size="small"
             onClick={handleReject}
             icon={<Close className="mr-1" fontSize="small" />}
-            isLoading={isCanceling}
+            isLoading={cancelFriendRequests.isLoading}
           >
             Cancel
           </Button>
@@ -65,63 +77,45 @@ const FriendRequestItem = ({ fullName, id, friendRequestId }) => {
 };
 
 const FriendRequests = () => {
-  const dispatch = useDispatch();
-  // Sử dụng RTK Query để lấy dữ liệu lời mời kết bạn
-  const { data, refetch, isLoading } = useGetPendingFriendRequestsQuery();
-  const [friendRequests, setFriendRequests] = useState([]);
   const { user } = useSelector((state) => state.auth);
 
-  // Cập nhật state từ dữ liệu API
-  useEffect(() => {
-    if (data?.data) {
-      setFriendRequests(data.data);
-      console.log("Friend requests loaded from API:", data.data.length);
-    }
-  }, [data]);
+  // Use the query directly without local state
+  const { data, isLoading } = useGetPendingFriendRequests();
+  const queryClient = useQueryClient();
 
-  // Hàm xử lý khi nhận được thông báo lời mời kết bạn mới
-  const handleNewFriendRequest = (message) => {
-    console.log("Received WebSocket message:", message);
+  // Get friend requests directly from the query data
+  const friendRequests = data?.data || [];
 
-    if (!message) {
-      console.warn("Received empty WebSocket message");
-      return;
-    }
+  // Handle new friend request from WebSocket
+  const handleNewFriendRequest = useCallback(
+    (message) => {
+      console.log("Received WebSocket message:", message);
 
-    // Kiểm tra loại thông báo
-    if (message.type === "NEW_FRIEND_REQUEST") {
-      const newFriendRequest = message.content;
-      console.log("New friend request received:", newFriendRequest);
-
-      if (!newFriendRequest?.id) {
-        console.warn("Invalid friend request data received");
+      if (!message) {
+        console.warn("Received empty WebSocket message");
         return;
       }
 
-      // Trực tiếp gọi refetch để lấy dữ liệu mới nhất từ API
-      console.log(
-        "Refetching friend requests from API due to WebSocket notification",
-      );
-      refetch();
+      // Check message type
+      if (message.type === "NEW_FRIEND_REQUEST") {
+        const newFriendRequest = message.content;
+        console.log("New friend request received:", newFriendRequest);
 
-      // Cập nhật state local cho đến khi refetch hoàn thành
-      setFriendRequests((prevRequests) => {
-        // Kiểm tra xem lời mời đã tồn tại chưa
-        const exists = prevRequests.some(
-          (req) => req.id === newFriendRequest.id,
-        );
-        if (!exists) {
-          console.log("Adding new friend request to UI");
-          return [newFriendRequest, ...prevRequests];
+        if (!newFriendRequest?.id) {
+          console.warn("Invalid friend request data received");
+          return;
         }
-        return prevRequests;
-      });
-    }
-  };
 
-  // Thiết lập WebSocket khi component mount
+        // Instead of updating local state, invalidate the query to refetch
+        queryClient.invalidateQueries(["pendingFriendRequests"]);
+      }
+    },
+    [queryClient],
+  );
+
+  // Set up WebSocket when component mounts
   useEffect(() => {
-    // Đảm bảo có user ID
+    // Ensure user ID is available
     if (!user?.id) {
       console.log("No user ID available, can't connect to WebSocket");
       return;
@@ -129,23 +123,23 @@ const FriendRequests = () => {
 
     console.log("Setting up WebSocket connection for user:", user.id);
 
-    // Kết nối đến WebSocket server
+    // Connect to WebSocket server
     websocketService
       .connect()
       .then(() => {
         console.log("WebSocket connection established, subscribing to topics");
 
-        // Đăng ký nhận thông báo lời mời kết bạn mới
+        // Subscribe to new friend request notifications
         websocketService.subscribeFriendRequests(
           user.id,
           handleNewFriendRequest,
         );
 
-        // Đăng ký nhận thông báo debug (để theo dõi)
+        // Subscribe to debug notifications for monitoring
         websocketService._subscribeToTopic("/topic/debug", (msg) => {
           console.log("Debug notification received:", msg);
 
-          // Nếu thông báo debug là lời mời kết bạn cho user hiện tại, xử lý nó
+          // If debug notification is a friend request for current user, handle it
           if (
             msg?.type === "NEW_FRIEND_REQUEST" &&
             msg?.content?.receiver?.id === user.id
@@ -158,7 +152,7 @@ const FriendRequests = () => {
         console.error("Failed to set up WebSocket connection:", error);
       });
 
-    // Cleanup khi component unmount
+    // Cleanup when component unmounts
     return () => {
       if (user?.id) {
         console.log("Cleaning up WebSocket subscriptions");
@@ -166,7 +160,7 @@ const FriendRequests = () => {
         websocketService.unsubscribe("/topic/debug");
       }
     };
-  }, [user, dispatch, refetch]);
+  }, [user, queryClient, handleNewFriendRequest]);
 
   if (isLoading) {
     return <div className="card">Loading...</div>;

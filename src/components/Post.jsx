@@ -1,13 +1,10 @@
+import { useCreateComment, useLikePost, useUnlikePost } from "@hooks/apiHook";
 import { useUserInfo } from "@hooks/index";
 import { Comment, Send, ThumbUp } from "@mui/icons-material";
 import { Avatar, Button, IconButton, TextField } from "@mui/material";
-import {
-  useCreateCommentMutation,
-  useLikePostsMutation,
-  useUnLikePostsMutation,
-} from "@services/rootApi";
+import { openSnackbar } from "@redux/slices/snackbarSlice";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { set } from "lodash";
 import React, { useState } from "react";
 
 const Post = ({
@@ -25,14 +22,22 @@ const Post = ({
   const [comment, setComment] = useState("");
 
   const baseImage = `http://localhost:8080/storage/posts`;
-  const [likePost] = useLikePostsMutation();
-  const [unLikePost] = useUnLikePostsMutation();
-  const [conmmentPost] = useCreateCommentMutation();
+
+  const likePost = useLikePost();
+  const unLikePost = useUnlikePost();
+  const conmmentPost = useCreateComment();
+  const queryClient = useQueryClient();
 
   const handleLikePost = async (postId) => {
     console.log("Post ID: ", postId);
     try {
-      await likePost(postId).unwrap();
+      // await likePost(postId).unwrap();
+      await likePost.mutateAsync(postId, {
+        onSuccess: (data) => {
+          console.log("Post liked successfully: ", data);
+          queryClient.invalidateQueries({ queryKey: ["posts"] });
+        },
+      });
     } catch (error) {
       console.error("Failed to like post: ", error);
     }
@@ -41,7 +46,12 @@ const Post = ({
   const handleUnLikePost = async (postId) => {
     console.log("Post ID: ", postId);
     try {
-      await unLikePost(postId).unwrap();
+      await unLikePost.mutateAsync(postId, {
+        onSuccess: (data) => {
+          console.log("Post unliked successfully: ", data);
+          queryClient.invalidateQueries({ queryKey: ["posts"] });
+        },
+      });
     } catch (error) {
       console.error("Failed to un like post: ", error);
     }
@@ -51,7 +61,23 @@ const Post = ({
     try {
       console.log("Post ID: ", postId);
       console.log("Comment: ", comment);
-      await conmmentPost({ postId, content: comment }).unwrap();
+      // await conmmentPost({ postId, content: comment }).unwrap();
+      await conmmentPost.mutateAsync(
+        { postId, content: comment },
+        {
+          onSuccess: (data) => {
+            console.log("Commented successfully: ", data);
+            queryClient.invalidateQueries({ queryKey: ["posts"] });
+          },
+          onError: (error) => {
+            console.error("Failed to comment: ", error);
+            openSnackbar({
+              message: error?.data?.error || "Failed to comment",
+              type: "error",
+            });
+          },
+        },
+      );
       setComment("");
       setIsCommentBoxOpen(false);
     } catch (error) {

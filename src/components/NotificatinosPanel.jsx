@@ -1,10 +1,12 @@
+import { useGetNotifications } from "@hooks/apiHook";
 import { Circle, Notifications } from "@mui/icons-material";
 import { Avatar, Badge, IconButton, Menu, MenuItem } from "@mui/material";
-import { useGetNotificationsQuery } from "@services/rootApi";
+
 import React, { useState } from "react";
 
 const NotificatinosPanel = () => {
-  const { data, isLoading, error } = useGetNotificationsQuery();
+  // const { data, isLoading, error } = useGetNotificationsQuery();
+  const { data, isLoading, error } = useGetNotifications();
   const [anchorEl, setAnchorEl] = useState(null);
 
   // Safely handle the notification count

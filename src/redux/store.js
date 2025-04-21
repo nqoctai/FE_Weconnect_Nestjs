@@ -4,17 +4,14 @@ import snackBarReducer from "@redux/slices/snackbarSlice";
 import settingsReducer from "@redux/slices/settingsSlice";
 import dialogReducer from "@redux/slices/dialogSlice";
 import postsReducer from "@redux/slices/postsSlice";
-
-import { rootApi } from "@services/rootApi";
 import storage from "redux-persist/lib/storage";
 import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, REHYDRATE } from "redux-persist";
-import { logOutMiddleware } from "@redux/middlewares";
 
 const persistConfig = {
     key: 'root',
     version: 1,
     storage,
-    blacklist: [rootApi.reducerPath,
+    blacklist: [
         'dialog', 'settings'
         ],
 }
@@ -25,7 +22,6 @@ const persistedReducer = persistReducer(persistConfig, combineReducers({
     settings: settingsReducer,
     dialog: dialogReducer,
     posts: postsReducer,
-    [rootApi.reducerPath]: rootApi.reducer
 }))
 
 export const store = configureStore({
@@ -42,7 +38,7 @@ export const store = configureStore({
                     REGISTER,
                 ]
             }
-        }).concat(logOutMiddleware,rootApi.middleware);
+        })
     }
 })
 

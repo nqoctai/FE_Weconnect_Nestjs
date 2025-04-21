@@ -7,6 +7,7 @@ import { Refresh } from "@mui/icons-material";
 
 const PostList = () => {
   const { isFetching, posts, refreshPosts } = useLazyLoadPost();
+  console.log("post list", posts);
   const userInfo = useUserInfo();
 
   return (

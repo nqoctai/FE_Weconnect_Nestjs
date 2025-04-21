@@ -2,19 +2,20 @@ import FormField from "@components/FormField";
 import TextInput from "@components/FormInputs/TextInput";
 import { Alert, Button } from "@mui/material";
 import { openSnackbar } from "@redux/slices/snackbarSlice";
-import { useRegisterMutation } from "@services/rootApi";
-import React, { useEffect } from "react";
+
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
+import { useRegister } from "@hooks/apiHook";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [register, { isLoading, data = {}, error, isSuccess }] =
-    useRegisterMutation();
+
+  const register = useRegister();
 
   const formSchema = yup.object().shape({
     name: yup.string().required("Name is required"),
@@ -36,20 +37,22 @@ const RegisterPage = () => {
       phone: "",
     },
   });
-  console.log({ data, isLoading });
 
-  const onSubmit = (formData) => {
+  const onSubmit = async (formData) => {
     console.log({ formData });
-    const res = register(formData);
-    console.log({ res });
+    await register.mutateAsync(formData, {
+      onSuccess: (data) => {
+        console.log("Register success", data);
+        dispatch(openSnackbar({ message: data?.message }));
+        navigate("/login");
+      },
+      onError: (error) => {
+        console.error("Register error", error);
+        const backendError = error?.response?.data;
+        dispatch(openSnackbar({ message: backendError?.error }));
+      },
+    });
   };
-
-  useEffect(() => {
-    if (isSuccess) {
-      dispatch(openSnackbar({ message: data?.message }));
-      navigate("/login");
-    }
-  }, [isSuccess, data.message, navigate, dispatch]);
 
   return (
     <div>
@@ -87,7 +90,11 @@ const RegisterPage = () => {
         <Button variant="contained" type="submit">
           Sign Up
         </Button>
-        {error && <Alert severity="error">{error?.data?.error}</Alert>}
+        {register.error && (
+          <Alert severity="error">
+            {register.error?.response?.data?.error}
+          </Alert>
+        )}
       </form>
       <p className="mt-4">
         Already have an account? <Link to={"/login"}>Sign in instead</Link>

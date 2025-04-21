@@ -1,23 +1,22 @@
 import Header from "@components/Header";
 import Loading from "@components/Loading";
+import { useGetProfile } from "@hooks/apiHook";
 import { saveUserInfor } from "@redux/slices/authSlice";
-import { useGetAuthUserQuery } from "@services/rootApi";
 import websocketService from "@services/websocket/websocketService";
 import React, { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { Navigate, Outlet } from "react-router-dom";
 
 const ProtectedLayout = () => {
-  const res = useGetAuthUserQuery();
+  // const res = useGetAuthUserQuery();
+  const { data, isSuccess, isLoading } = useGetProfile();
   const dispatch = useDispatch();
   const wsConnected = useRef(false);
 
-  console.log("Protected layout rendering, auth response:", res);
-
   useEffect(() => {
-    if (res.isSuccess && res?.data?.data) {
-      console.log("User data loaded:", res?.data?.data);
-      const userData = res?.data?.data;
+    if (isSuccess && data?.data) {
+      console.log("User data loaded:", data?.data);
+      const userData = data?.data;
       dispatch(saveUserInfor(userData));
 
       // Kết nối WebSocket chỉ một lần khi có dữ liệu người dùng
@@ -50,9 +49,9 @@ const ProtectedLayout = () => {
         wsConnected.current = false;
       }
     };
-  }, [res.isSuccess, dispatch, res?.data?.data]);
+  }, [isSuccess, dispatch, data?.data]);
 
-  if (res.isLoading) {
+  if (isLoading) {
     return <Loading />;
   }
 

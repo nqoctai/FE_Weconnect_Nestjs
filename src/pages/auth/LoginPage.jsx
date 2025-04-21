@@ -2,20 +2,19 @@ import FormField from "@components/FormField";
 import TextInput from "@components/FormInputs/TextInput";
 import { Alert, Button, CircularProgress } from "@mui/material";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
 
 import { Link, useNavigate } from "react-router-dom";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useLoginMutation } from "@services/rootApi";
 import { useDispatch } from "react-redux";
 import { openSnackbar } from "@redux/slices/snackbarSlice";
 import { login as loginAction } from "@redux/slices/authSlice";
+import { useLogin } from "@hooks/apiHook";
 
 const LoginPage = () => {
-  const [login, { isLoading, data = {}, error, isSuccess, isError }] =
-    useLoginMutation();
+  const { mutate, isLoading, error, data } = useLogin();
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -38,25 +37,27 @@ const LoginPage = () => {
   });
 
   const onSubmit = (formData) => {
-    console.log({ formData });
-    login(formData);
-    console.log(data);
-    // Call your login API here with formData
+    mutate(
+      { username: formData.email, password: formData.password },
+      {
+        onSuccess: (data) => {
+          console.log("Login successful", data);
+          dispatch(openSnackbar({ message: data?.message }));
+          localStorage.setItem("access_token", data?.data?.accessToken);
+          dispatch(loginAction({ accessToken: data?.data?.accessToken }));
+          navigate("/");
+        },
+        onError: (error) => {
+          console.log("Login failed", error);
+          const backendError = error?.response?.data;
+          dispatch(
+            openSnackbar({ message: backendError?.error, type: "error" }),
+          );
+        },
+      },
+    );
+    console.log("data >>>", data);
   };
-
-  useEffect(() => {
-    if (isError) {
-      dispatch(openSnackbar({ message: error?.data?.error, type: "error" }));
-    }
-
-    if (isSuccess) {
-      console.log({ data });
-      dispatch(openSnackbar({ message: data?.message }));
-      localStorage.setItem("accessToken", data?.data?.accessToken);
-      dispatch(loginAction({ accessToken: data?.data?.accessToken }));
-      navigate("/");
-    }
-  }, [isError, error, dispatch, data.message, isSuccess, navigate]);
 
   return (
     <div>
@@ -81,7 +82,7 @@ const LoginPage = () => {
           {isLoading && <CircularProgress size={"16px"} className="mr-1" />}
           Sign In
         </Button>
-        {error && <Alert severity="error">{error?.data?.error}</Alert>}
+        {error && <Alert severity="error">{error?.response?.data.error}</Alert>}
       </form>
       <p className="mt-4">
         New on our platform?{" "}

@@ -3,16 +3,18 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux"
 import { useMediaQuery, useTheme } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { rootApi, useGetPostsQuery } from "@services/rootApi";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { throttle } from "lodash";
+import { useGetPosts } from "@hooks/apiHook";
+import { callLogout } from "@services/api";
 
 export const useLogout = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
 
-    const logOut = () => {
+    const logOut = async () => {
+        await callLogout();
         dispatch(logOutAction());
         navigate("/login", {replace: true});
 
@@ -46,11 +48,13 @@ export const useLazyLoadPost = () => {
     const refreshToken = useSelector((state) => state.posts.refreshToken);
     
     // Sử dụng refreshToken như một phần của query key để đảm bảo refetch
-    const { data, isSuccess, isFetching } = useGetPostsQuery({
-        page: page,
-        size,
-        refreshToken
-    });
+    // const { data, isSuccess, isFetching } = useGetPostsQuery({
+    //     page: page,
+    //     size,
+    //     refreshToken
+    // });
+
+    const {data, isSuccess, isFetching} = useGetPosts(page, size);
     
     // Reset toàn bộ danh sách khi unmount hoặc khi refreshToken thay đổi
     useEffect(() => {
@@ -138,35 +142,3 @@ export const useInfiniteScroll = ({hasMore, loadMore, isFetching, threshold = 50
     }, [handleScroll]);
 }
 
-
-export const useCacheRedux = (friendRequestId) => {
-  const dispatch = useDispatch();
-  const cacheRedux = () => {
-    try {
-      dispatch(
-        rootApi.util.updateQueryData(
-          "getPendingFriendRequests",
-          undefined,
-          (draft) => {
-            if (!draft.data) {
-              draft.data = [];
-            }
-            // Xóa lời mời đã chấp nhận khỏi danh sách
-            const index = draft.data.findIndex(
-              (req) => req.id === friendRequestId,
-            );
-            if (index !== -1) {
-              draft.data.splice(index, 1);
-            }
-          },
-        ),
-      );
-      console.log("RTK Query cache updated after accepting friend request");
-    } catch (error) {
-      console.error("Failed to update RTK Query cache:", error);
-    }
-  }
-
-  return {cacheRedux}
-   
-}

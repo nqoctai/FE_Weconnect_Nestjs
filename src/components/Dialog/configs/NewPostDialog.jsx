@@ -9,73 +9,101 @@ import {
 } from "@mui/material";
 import { closeDialog } from "@redux/slices/dialogSlice";
 import { openSnackbar } from "@redux/slices/snackbarSlice";
-import { refreshRequested } from "@redux/slices/postsSlice";
-import {
-  rootApi,
-  useCreatePostMutation,
-  useUploadImageMutation,
-} from "@services/rootApi";
+
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
+import { useCreatePost, useUploadImage } from "@hooks/apiHook";
+import { useQueryClient } from "@tanstack/react-query";
 
 const NewPostDialog = ({ userInfo }) => {
   const [image, setImage] = useState(null);
-
-  const [createNewPost, { isLoading }] = useCreatePostMutation();
-
-  const [uploadImage] = useUploadImageMutation();
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const { mutateAsync: uploadImageAsync } = useUploadImage();
+  const { mutateAsync: createPostAsync } = useCreatePost();
   const dispatch = useDispatch();
-
-  const [content, setContent] = useState();
+  const [content, setContent] = useState("");
 
   const handleCreateNewPost = async () => {
     try {
-      const formData = new FormData();
-      formData.append("folder", "posts");
-      formData.append("file", image);
+      setIsSubmitting(true);
 
-      let uploadResult;
+      // Biến lưu trữ tên file ảnh sau khi upload (nếu có)
+      let imageFileName = null;
+
+      // Nếu có ảnh, upload ảnh trước
       if (image) {
-        uploadResult = await uploadImage(formData).unwrap();
-        console.log("res upload", uploadResult);
+        const formData = new FormData();
+        formData.append("folder", "posts");
+        formData.append("file", image);
+
+        console.log("Uploading image...");
+
+        try {
+          // Sử dụng mutateAsync để đợi kết quả upload
+          const uploadResult = await uploadImageAsync(formData);
+          console.log("Image uploaded successfully", uploadResult);
+
+          if (uploadResult?.data?.fileName) {
+            imageFileName = uploadResult.data.fileName;
+            console.log("Image file name:", imageFileName);
+          }
+        } catch (uploadError) {
+          console.error("Image upload failed", uploadError);
+          const backendError = uploadError?.response?.data;
+          dispatch(
+            openSnackbar({
+              message: backendError?.error || "Không thể tải ảnh lên",
+              type: "error",
+            }),
+          );
+          setIsSubmitting(false);
+          return; // Dừng quá trình nếu upload ảnh thất bại
+        }
       }
 
-      const res = await createNewPost({
+      // Sau khi đã upload ảnh thành công (hoặc không có ảnh), tạo bài viết
+      console.log(
+        "Creating post with content and image:",
         content,
-        image: uploadResult?.data?.fileName,
-      }).unwrap();
-
-      // Cập nhật cache tạm thời (optimistic update)
-      dispatch(
-        rootApi.util.updateQueryData(
-          "getPosts",
-          { page: 1, size: 10 },
-          (draft) => {
-            draft.data.result.unshift(res.data);
-          },
-        ),
+        imageFileName,
       );
 
-      // Chủ động làm mới dữ liệu từ server
-      dispatch(
-        rootApi.endpoints.getPosts.initiate(
-          { page: 1, size: 10 },
-          { forceRefetch: true },
-        ),
-      );
+      try {
+        // Tạo bài viết với ảnh (nếu có)
+        const postResult = await createPostAsync({
+          content,
+          image: imageFileName,
+        });
 
-      // Đồng thời invalidate tags để các queries khác cũng được làm mới
-      dispatch(rootApi.util.invalidateTags(["POSTS"]));
+        console.log("Post created successfully", postResult);
 
-      // Dispatch action để refresh danh sách post
-      dispatch(refreshRequested());
+        // Invalidate tất cả queries liên quan đến posts
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
 
-      console.log("Post created successfully, requested refresh");
-      dispatch(closeDialog());
-      dispatch(openSnackbar({ message: "Create Posts Successfully!" }));
+        // Đóng dialog và hiển thị thông báo thành công
+        dispatch(closeDialog());
+        dispatch(openSnackbar({ message: "Tạo bài viết thành công!" }));
+      } catch (postError) {
+        console.error("Post creation failed", postError);
+        const backendError = postError?.response?.data;
+        dispatch(
+          openSnackbar({
+            message: backendError?.error || "Không thể tạo bài viết",
+            type: "error",
+          }),
+        );
+      }
     } catch (error) {
-      dispatch(openSnackbar({ message: error?.data?.error, type: "error" }));
+      console.error("Unexpected error", error);
+      dispatch(
+        openSnackbar({
+          message: "Đã xảy ra lỗi không xác định",
+          type: "error",
+        }),
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -92,7 +120,7 @@ const NewPostDialog = ({ userInfo }) => {
         </div>
         <TextareaAutosize
           minRows={3}
-          placeholder="What's on your mine?"
+          placeholder="Bạn đang nghĩ gì?"
           className="mt-4 w-full p-2"
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -102,12 +130,12 @@ const NewPostDialog = ({ userInfo }) => {
       <DialogActions className="!px-6 !pb-5 !pt-0">
         <Button
           fullWidth
-          disabled={!isValid}
+          disabled={!isValid || isSubmitting}
           variant="contained"
           onClick={handleCreateNewPost}
         >
-          {isLoading && <CircularProgress size={"16px"} className="mr-1" />}
-          Post
+          {isSubmitting && <CircularProgress size={"16px"} className="mr-2" />}
+          Đăng bài
         </Button>
       </DialogActions>
     </div>
