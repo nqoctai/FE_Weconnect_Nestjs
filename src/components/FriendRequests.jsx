@@ -1,8 +1,6 @@
 import { Check, Close } from "@mui/icons-material";
 import { Avatar } from "@mui/material";
-import React, { useEffect, useCallback } from "react";
-import websocketService from "@services/websocket/websocketService";
-import { useSelector } from "react-redux";
+import React, { useEffect, useState } from "react";
 
 import Button from "@components/Button";
 import {
@@ -11,6 +9,7 @@ import {
   useRejectFriendRequest,
 } from "@hooks/apiHook";
 import { useQueryClient } from "@tanstack/react-query";
+import { socket } from "@context/SocketProvider";
 
 const FriendRequestItem = ({ fullName, friendRequestId }) => {
   const acceptFriendRequests = useAcceptFriendRequest();
@@ -77,90 +76,25 @@ const FriendRequestItem = ({ fullName, friendRequestId }) => {
 };
 
 const FriendRequests = () => {
-  const { user } = useSelector((state) => state.auth);
-
-  // Use the query directly without local state
   const { data, isLoading } = useGetPendingFriendRequests();
   const queryClient = useQueryClient();
+  const [friendRequests, setFriendRequests] = useState([]);
 
-  // Get friend requests directly from the query data
-  const friendRequests = data?.data || [];
-
-  // Handle new friend request from WebSocket
-  const handleNewFriendRequest = useCallback(
-    (message) => {
-      console.log("Received WebSocket message:", message);
-
-      if (!message) {
-        console.warn("Received empty WebSocket message");
-        return;
-      }
-
-      // Check message type
-      if (message.type === "NEW_FRIEND_REQUEST") {
-        const newFriendRequest = message.content;
-        console.log("New friend request received:", newFriendRequest);
-
-        if (!newFriendRequest?.id) {
-          console.warn("Invalid friend request data received");
-          return;
-        }
-
-        // Instead of updating local state, invalidate the query to refetch
-        queryClient.invalidateQueries(["pendingFriendRequests"]);
-      }
-    },
-    [queryClient],
-  );
-
-  // Set up WebSocket when component mounts
   useEffect(() => {
-    // Ensure user ID is available
-    if (!user?.id) {
-      console.log("No user ID available, can't connect to WebSocket");
-      return;
+    if (data?.data) {
+      setFriendRequests(data.data || []);
     }
-
-    console.log("Setting up WebSocket connection for user:", user.id);
-
-    // Connect to WebSocket server
-    websocketService
-      .connect()
-      .then(() => {
-        console.log("WebSocket connection established, subscribing to topics");
-
-        // Subscribe to new friend request notifications
-        websocketService.subscribeFriendRequests(
-          user.id,
-          handleNewFriendRequest,
-        );
-
-        // Subscribe to debug notifications for monitoring
-        websocketService._subscribeToTopic("/topic/debug", (msg) => {
-          console.log("Debug notification received:", msg);
-
-          // If debug notification is a friend request for current user, handle it
-          if (
-            msg?.type === "NEW_FRIEND_REQUEST" &&
-            msg?.content?.receiver?.id === user.id
-          ) {
-            handleNewFriendRequest(msg);
-          }
-        });
-      })
-      .catch((error) => {
-        console.error("Failed to set up WebSocket connection:", error);
-      });
-
-    // Cleanup when component unmounts
-    return () => {
-      if (user?.id) {
-        console.log("Cleaning up WebSocket subscriptions");
-        websocketService.unsubscribe(`/topic/friend-requests/${user.id}`);
-        websocketService.unsubscribe("/topic/debug");
-      }
+    const handleFriendRequest = async () => {
+      console.log("Friend request received");
+      // Gọi lại API hoặc để React Query tự refetch
+      await queryClient.invalidateQueries(["pendingFriendRequests"]);
     };
-  }, [user, queryClient, handleNewFriendRequest]);
+    socket.on("friendRequestReceived", handleFriendRequest);
+
+    return () => {
+      socket.off("friendRequestReceived", handleFriendRequest);
+    };
+  }, [queryClient, data]);
 
   if (isLoading) {
     return <div className="card">Loading...</div>;
@@ -169,7 +103,7 @@ const FriendRequests = () => {
   return (
     <div className="card">
       <p className="mb-4 font-bold">
-        Friends Requests ({friendRequests.length})
+        Friends Requests ({friendRequests?.length || 0})
       </p>
       <div className="space-y-4">
         {friendRequests && friendRequests.length > 0 ? (

@@ -1,5 +1,6 @@
 import MyButton from "@components/Button";
 import Loading from "@components/Loading";
+import { socket } from "@context/SocketProvider";
 import {
   useAcceptFriendRequest,
   useRejectFriendRequest,
@@ -32,7 +33,11 @@ const UserCard = ({
 
   const handleSendRequest = async () => {
     console.log("Send friend request", id);
-    // Thêm logic gửi lời mời kết bạn ở đây
+
+    socket.emit("friendRequestSent", {
+      receiverId: id,
+    });
+
     await sendRequest.mutateAsync(id, {
       onSuccess: (data) => {
         console.log("Friend request sent successfully", data);

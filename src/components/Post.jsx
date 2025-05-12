@@ -21,7 +21,7 @@ const Post = ({
   const [isCommentBoxOpen, setIsCommentBoxOpen] = useState(false);
   const [comment, setComment] = useState("");
 
-  const baseImage = `http://localhost:8080/storage/posts`;
+  const baseImage = `http://localhost:8080/images/posts`;
 
   const likePost = useLikePost();
   const unLikePost = useUnlikePost();

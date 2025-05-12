@@ -53,7 +53,7 @@ export const createComment = (postId, content) => {
 // Users API services
 export const searchUsers = (filter, page = 0, size = 10) => {
     const encodedQuery = encodeURIComponent(filter.trim());
-    return axios.get(`/users?filter=name~'${encodedQuery}'&page=${page}&size=${size}`);
+    return axios.get(`/users?page=${page}&size=${size}`);
 };
 
 // Friends API services
